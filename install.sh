@@ -12,14 +12,14 @@ USE_WGET=false
 # Check if curl exists
 if command -v curl &> /dev/null; then
   USE_CURL=true
-  DL_COMMAND="curl -o"
+  DL_COMMAND="curl -s -o"
 fi
 
 if ! $USE_CURL; then
   # Check if wget exists
   if command -v wget &> /dev/null; then
     USE_WGET=true
-    DL_COMMAND="wget -O"
+    DL_COMMAND="wget --quiet -O"
   fi
 fi
 
