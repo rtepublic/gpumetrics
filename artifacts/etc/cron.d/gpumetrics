@@ -1,0 +1,4 @@
+MAILTO=""
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+*/10 * * * * root test -x /usr/local/bin/gpumetrics.sh && /usr/local/bin/gpumetrics.sh

@@ -1,0 +1,8 @@
+/var/log/gpumetrics.log
+{
+    rotate 7
+    daily
+    missingok
+    notifempty
+    compress
+}
