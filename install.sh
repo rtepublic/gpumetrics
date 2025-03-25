@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# filepath: /home/krisz/gitprojects/gpumetrics_github/install.sh
 
 # Check if running as root
 if [ "$(id -u)" -ne 0 ]; then
