@@ -24,7 +24,7 @@ if ! $USE_CURL; then
 fi
 
 if ! $USE_CURL && ! $USE_WGET; then
-  echo "Neither curl nor wget is installed. Please install one of them to proceed."
+  echo "ERROR: Neither curl nor wget is installed. Please install one of them to proceed."
   exit 1
 fi
 
@@ -44,7 +44,7 @@ download_file() {
     $DL_COMMAND "$destination" "$source_url"
     
     if [ ! -f "$destination" ]; then
-        echo "Failed to install $description."
+        echo "ERROR: Failed to install $description."
         exit 1
     fi
 }
@@ -69,4 +69,4 @@ else
     echo "WARNING: Could not restart rsyslog service. Please restart it manually."
 fi
 
-echo "Installation completed successfully!"
+echo "OK: Installation completed successfully!"
