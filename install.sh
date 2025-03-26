@@ -40,7 +40,6 @@ download_file() {
     local source_url=$2
     local description=$3
     
-    echo "Installing $description..."
     $DL_COMMAND "$destination" "$source_url"
     
     if [ ! -f "$destination" ]; then
