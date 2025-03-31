@@ -109,6 +109,7 @@ function get_amd {
     GPUTemperature=$(printf "%.0f" "$AMDSensorTemp")
     GPUTotalRAM=$AMDVRAMTotalMem
     GPUUsedRAM=$AMDVRAMTotalUsedMem
+    GPUMemPercentUsed=$(awk "BEGIN {printf \"%d\", ($GPUUsedRAM/$GPUTotalRAM)*100}")
     GPUUtilPercent=$AMDGPUUse
     GPUUtilPercentAvg=$AMDGPUUse
     write_log
