@@ -81,14 +81,16 @@ get_amd() {
     exit 1
   fi
 
-  echo "$output" | awk -F',' 'NF && NR==1 {
-    print $0
+  echo "$output" | awk -F',' '
+  NR==1 {
+    next
   }
-  NF && NR>1 {
+  /^card/ {
     $7 = sprintf("%.2f", $7 / 1024 / 1024)
     $8 = sprintf("%.2f", $8 / 1024 / 1024)
     print $1","$2","$3","$4","$5","$6","$7","$8","$9","$10","$11","$12","$13","$14","$15","$16","$17
   }' | while IFS=, read -r AMDCARD AMDSensorTemp AMDMemTemp AMDPower AMDGPUUse AMDGFXActivity AMDVRAMTotalMem AMDVRAMTotalUsedMem AMDCardSeries AMDCardModel AMDCardVendor AMDCardSKU AMDSubsystemID AMDDeviceRev AMDNodeId AMDGUID AMDGFXVersion; do
+
     if [[ "$AMDCARD" == "device" || -z "$AMDCARD" ]]; then
       continue
     fi
