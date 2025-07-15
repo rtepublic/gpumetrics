@@ -23,13 +23,19 @@ ReportTime=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
 ResourceID=""
 TimeGenerated=""
 
+# Define error writer before first use
+write_error () {
+  echo "$1" | $LOGGER_ERR
+}
+
+# Root permission check
 if [ "$EUID" -ne 0 ]; then
-  >&2 echo "This script must be run as root"
+  write_error "This script must be run as root"
   exit 1
 fi
 
 if ! command -v curl &> /dev/null; then
-  echo "curl command not found" | $LOGGER_ERR
+  write_error "curl command not found"
   exit 1
 fi
 
@@ -43,10 +49,6 @@ trim() {
   var="${var#"${var%%[![:space:]]*}"}"
   var="${var%"${var##*[![:space:]]}"}"
   printf '%s' "$var"
-}
-
-write_error () {
-  echo "$1" | $LOGGER_ERR
 }
 
 write_log() {
@@ -82,9 +84,7 @@ get_amd() {
   fi
 
   echo "$output" | awk -F',' '
-  NR==1 {
-    next
-  }
+  NR==1 { next }
   /^card/ {
     $7 = sprintf("%.2f", $7 / 1024 / 1024)
     $8 = sprintf("%.2f", $8 / 1024 / 1024)
