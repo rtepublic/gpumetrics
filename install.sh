@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# filepath: /home/krisz/gitprojects/gpumetrics_github/install.sh
 
 # Check if running as root
 if [ "$(id -u)" -ne 0 ]; then
@@ -6,8 +7,30 @@ if [ "$(id -u)" -ne 0 ]; then
    exit 1
 fi
 
+# Default values
+TAG=""
 USE_CURL=false
 USE_WGET=false
+
+# Parse command line arguments
+while getopts "t:h" opt; do
+  case $opt in
+    t)
+      TAG="$OPTARG"
+      ;;
+    h)
+      echo "Usage: $0 [-t TAG]"
+      echo "  -t TAG    Install from specific tag (default: main branch)"
+      echo "  -h        Show this help message"
+      exit 0
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      echo "Use -h for help"
+      exit 1
+      ;;
+  esac
+done
 
 # Check if curl exists
 if command -v curl &> /dev/null; then
@@ -48,7 +71,14 @@ download_file() {
     fi
 }
 
-BASE_URL="https://raw.githubusercontent.com/rtepublic/gpumetrics/refs/heads/main/artifacts"
+# Set BASE_URL based on whether a tag was specified
+if [ -n "$TAG" ]; then
+    BASE_URL="https://raw.githubusercontent.com/rtepublic/gpumetrics/refs/tags/$TAG/artifacts"
+    echo "Installing from tag: $TAG"
+else
+    BASE_URL="https://raw.githubusercontent.com/rtepublic/gpumetrics/refs/heads/main/artifacts"
+    echo "Installing from main branch"
+fi
 
 # Download files
 download_file "/usr/local/bin/gpumetrics.sh" "$BASE_URL/usr/local/bin/gpumetrics.sh" "gpumetrics script"
