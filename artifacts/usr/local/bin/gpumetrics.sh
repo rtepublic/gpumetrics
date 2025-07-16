@@ -74,29 +74,30 @@ get_nvidia() {
 }
 
 get_amd() {
-  declare -A AMD_POWER_CAPS=()
+  declare -A AMD_POWER_CAPS
 
-  # Parse power cap from rocm-smi -M output
-  while read -r line; do
-    if [[ "$line" =~ ^GPU\[([0-9]+)\]\ :\ Max\ Graphics\ Package\ Power.*:\ ([0-9.]+) ]]; then
-      gpu_index="${BASH_REMATCH[1]}"
-      cap="${BASH_REMATCH[2]}"
-      AMD_POWER_CAPS["$gpu_index"]="$cap"
-    fi
-  done < <($ROCM_SMI -M 2>/dev/null)
+# Get AMD power cap here
+while read -r line; do
+  if [[ "$line" =~ ^GPU\[([0-9]+)\]\ :\ Max\ Graphics\ Package\ Power.*:\ ([0-9.]+)\ W ]]; then
+    gpu_index="${BASH_REMATCH[1]}"
+    cap="${BASH_REMATCH[2]}"
+    AMD_POWER_CAPS["$gpu_index"]="$cap"
+  fi
+done < <($ROCM_SMI -M 2>/dev/null)
+
 
   output=$(timeout $TIMEOUT $ROCM_SMI --showmeminfo=vram --showproductname --showtemp --showuse --showpower --csv)
   if [ $? -ne 0 ]; then
     write_error "rocm-smi command failed"
     exit 1
   fi
-# convert bytes to MiB for GPU mem utilization for AMD GPUs
+# Convert byte to MiB for GPU mem utilization for AMD GPUs
   echo "$output" | awk -F',' '
     NR==1 { next }
     /^card/ {
       $7 = sprintf("%.2f", $7 / 1024 / 1024)
       $8 = sprintf("%.2f", $8 / 1024 / 1024)
-      print $0
+      print $1","$2","$3","$4","$5","$6","$7","$8","$9","$10","$11","$12","$13","$14","$15","$16","$17
     }
   ' | while IFS=, read -r AMDCARD AMDSensorTemp AMDMemTemp AMDPower AMDGPUUse AMDGFXActivity AMDVRAMTotalMem AMDVRAMUsedMem AMDCardSeries AMDCardModel AMDCardVendor AMDCardSKU AMDSubsystemID AMDDeviceRev AMDNodeId AMDGUID AMDGFXVersion; do
 
