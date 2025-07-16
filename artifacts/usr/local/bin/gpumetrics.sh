@@ -24,8 +24,9 @@ ReportTime=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
 ResourceID=""
 TimeGenerated=""
 
-# Define error writer before first use
+# Define error writer before first use — also echo to stderr for CLI visibility
 write_error () {
+  echo "$1" >&2
   echo "$1" | $LOGGER_ERR
 }
 
@@ -53,7 +54,9 @@ trim() {
 }
 
 write_log() {
-  echo "{\"ResourceID\":\"$ResourceID\",\"GPUName\":\"$GPUName\",\"GPUTotalRAM\":$GPUTotalRAM,\"GPUUsedRAM\":$GPUUsedRAM,\"GPUMemPercentUsed\":$GPUMemPercentUsed,\"GPUUtilPercent\":$GPUUtilPercent,\"GPUUtilPercentAvg\":$GPUUtilPercentAvg,\"GPUTemperature\":$GPUTemperature,\"GPUPowerDraw\":$GPUPowerDraw,\"GPUPowerCap\":$GPUPowerCap,\"GPUInstance\":$GPUInstance,\"GPUDriverVersion\":\"$GPUDriverVersion\",\"ReportTime\":\"$ReportTime\"}" | $LOGGER
+  JSON="{\"ResourceID\":\"$ResourceID\",\"GPUName\":\"$GPUName\",\"GPUTotalRAM\":$GPUTotalRAM,\"GPUUsedRAM\":$GPUUsedRAM,\"GPUMemPercentUsed\":$GPUMemPercentUsed,\"GPUUtilPercent\":$GPUUtilPercent,\"GPUUtilPercentAvg\":$GPUUtilPercentAvg,\"GPUTemperature\":$GPUTemperature,\"GPUPowerDraw\":$GPUPowerDraw,\"GPUPowerCap\":$GPUPowerCap,\"GPUInstance\":$GPUInstance,\"GPUDriverVersion\":\"$GPUDriverVersion\",\"ReportTime\":\"$ReportTime\"}"
+  echo "$JSON"  # Echo to CLI
+  echo "$JSON" | $LOGGER
 }
 
 get_nvidia() {
@@ -80,8 +83,8 @@ get_nvidia() {
 }
 
 get_amd() {
+  # Parse out the GPU power cap per card using rocm-smi -M (for Max Power)
   declare -A AMD_POWER_CAPS
-
   while read -r line; do
     if [[ "$line" =~ ^GPU\[([0-9]+)\][[:space:]]*:[[:space:]]*Max\ Graphics\ Package\ Power\ \(W\):\ ([0-9.]+) ]]; then
       gpu_index="${BASH_REMATCH[1]}"
@@ -90,29 +93,33 @@ get_amd() {
     fi
   done < <($ROCM_SMI -M 2>/dev/null)
 
+  # Get GPU stats from rocm-smi in CSV format
   output=$(timeout $TIMEOUT $ROCM_SMI --showmeminfo=vram --showproductname --showtemp --showuse --showpower --csv)
   if [ $? -ne 0 ]; then
     write_error "rocm-smi command failed - $output"
     exit 1
   fi
 
+  # Convert memory values from bytes to MiB, and emit in parsed format
   echo "$output" | awk -F',' '
-  NR==1 { next }
-  /^card/ {
-    $7 = sprintf("%.2f", $7 / 1024 / 1024)
-    $8 = sprintf("%.2f", $8 / 1024 / 1024)
-    print $1","$2","$3","$4","$5","$6","$7","$8","$9","$10","$11","$12","$13","$14","$15","$16","$17
-  }' | while IFS=, read -r AMDCARD AMDSensorTemp AMDMemTemp AMDPower AMDGPUUse AMDGFXActivity AMDVRAMTotalMem AMDVRAMTotalUsedMem AMDCardSeries AMDCardModel AMDCardVendor AMDCardSKU AMDSubsystemID AMDDeviceRev AMDNodeId AMDGUID AMDGFXVersion; do
+    NR==1 { next }  # skip CSV header
+    /^card/ {
+      $7 = sprintf("%.2f", $7 / 1024 / 1024)
+      $8 = sprintf("%.2f", $8 / 1024 / 1024)
+      print $1","$2","$3","$4","$5","$6","$7","$8","$9","$10","$11","$12","$13","$14","$15","$16","$17
+    }
+  ' | while IFS=, read -r AMDCARD AMDSensorTemp AMDMemTemp AMDPower AMDGPUUse AMDGFXActivity AMDVRAMTotalMem AMDVRAMUsedMem AMDCardSeries AMDCardModel AMDCardVendor AMDCardSKU AMDSubsystemID AMDDeviceRev AMDNodeId AMDGUID AMDGFXVersion; do
 
     if [[ "$AMDCARD" == "device" || -z "$AMDCARD" ]]; then
       continue
     fi
+
     GPUDriverVersion=$AMDGFXVersion
     GPUInstance=$(echo "$AMDCARD" | tr -d "card")
     GPUName="AMD $AMDCardSeries"
     GPUTemperature=$(printf "%.0f" "$AMDSensorTemp")
     GPUTotalRAM=$AMDVRAMTotalMem
-    GPUUsedRAM=$AMDVRAMTotalUsedMem
+    GPUUsedRAM=$AMDVRAMUsedMem
     GPUMemPercentUsed=$(awk "BEGIN {printf \"%d\", ($GPUUsedRAM/$GPUTotalRAM)*100}")
     GPUUtilPercent=$AMDGPUUse
     GPUUtilPercentAvg=$AMDGPUUse
@@ -150,3 +157,4 @@ if [ "$GPU_TYPE" = "NVIDIA" ]; then
 elif [ "$GPU_TYPE" = "AMD" ]; then
   get_amd
 fi
+
