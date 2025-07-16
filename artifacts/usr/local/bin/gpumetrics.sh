@@ -78,7 +78,7 @@ get_amd() {
 
 # Get AMD power cap here
 while read -r line; do
-  if [[ "$line" =~ ^GPU\[([0-9]+)\]\ :\ Max\ Graphics\ Package\ Power.*:\ ([0-9.]+)\ W ]]; then
+  if [[ "$line" =~ ^GPU\[([0-9]+)\]\s+:\s+Max\ Graphics\ Package\ Power.*:\s+([0-9.]+)\ W ]]; then
     gpu_index="${BASH_REMATCH[1]}"
     cap="${BASH_REMATCH[2]}"
     AMD_POWER_CAPS["$gpu_index"]="$cap"
