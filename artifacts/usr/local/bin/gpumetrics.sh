@@ -19,11 +19,11 @@ GPUUsedRAM=""
 GPUUtilPercent=""
 GPUUtilPercentAvg=""
 GPUPowerDraw=""
+GPUPowerCap=""
 ReportTime=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
 ResourceID=""
 TimeGenerated=""
 
-# Define error writer before first use
 write_error () {
   echo "$1" | $LOGGER_ERR
 }
@@ -52,17 +52,17 @@ trim() {
 }
 
 write_log() {
-  echo "{\"ResourceID\":\"$ResourceID\",\"GPUName\":\"$GPUName\",\"GPUTotalRAM\":$GPUTotalRAM,\"GPUUsedRAM\":$GPUUsedRAM,\"GPUMemPercentUsed\":$GPUMemPercentUsed,\"GPUUtilPercent\":$GPUUtilPercent,\"GPUUtilPercentAvg\":$GPUUtilPercentAvg,\"GPUTemperature\":$GPUTemperature,\"GPUPowerDraw\":$GPUPowerDraw,\"GPUInstance\":$GPUInstance,\"GPUDriverVersion\":\"$GPUDriverVersion\",\"ReportTime\":\"$ReportTime\"}" | $LOGGER
+  echo "{\"ResourceID\":\"$ResourceID\",\"GPUName\":\"$GPUName\",\"GPUTotalRAM\":$GPUTotalRAM,\"GPUUsedRAM\":$GPUUsedRAM,\"GPUMemPercentUsed\":$GPUMemPercentUsed,\"GPUUtilPercent\":$GPUUtilPercent,\"GPUUtilPercentAvg\":$GPUUtilPercentAvg,\"GPUTemperature\":$GPUTemperature,\"GPUPowerDraw\":$GPUPowerDraw,\"GPUPowerCap\":$GPUPowerCap,\"GPUInstance\":$GPUInstance,\"GPUDriverVersion\":\"$GPUDriverVersion\",\"ReportTime\":\"$ReportTime\"}" | $LOGGER
 }
 
 get_nvidia() {
-  output=$(timeout $TIMEOUT $NVIDIA_SMI --query-gpu=driver_version,index,utilization.memory,name,temperature.gpu,memory.total,memory.used,utilization.gpu,utilization.gpu,power.draw --format=csv,noheader,nounits)
+  output=$(timeout $TIMEOUT $NVIDIA_SMI --query-gpu=driver_version,index,utilization.memory,name,temperature.gpu,memory.total,memory.used,utilization.gpu,utilization.gpu,power.draw,power.limit --format=csv,noheader,nounits)
   if [ $? -ne 0 ]; then
     write_error "nvidia-smi command failed - $output"
     exit 1
   fi
 
-  echo "$output" | while IFS=, read -r GPUDriverVersion GPUInstance GPUMemPercentUsed GPUName GPUTemperature GPUTotalRAM GPUUsedRAM GPUUtilPercent GPUUtilPercentAvg GPUPowerDraw; do
+  echo "$output" | while IFS=, read -r GPUDriverVersion GPUInstance GPUMemPercentUsed GPUName GPUTemperature GPUTotalRAM GPUUsedRAM GPUUtilPercent GPUUtilPercentAvg GPUPowerDraw GPUPowerCap; do
     GPUName=$(trim "$GPUName")
     GPUTotalRAM=$(trim "$GPUTotalRAM")
     GPUUsedRAM=$(trim "$GPUUsedRAM")
@@ -71,18 +71,30 @@ get_nvidia() {
     GPUUtilPercentAvg=$(trim "$GPUUtilPercentAvg")
     GPUTemperature=$(trim "$GPUTemperature")
     GPUPowerDraw=$(trim "$GPUPowerDraw")
+    GPUPowerCap=$(trim "$GPUPowerCap")
     GPUInstance=$(trim "$GPUInstance")
     write_log
   done
 }
 
 get_amd() {
+  # Gather power cap info first using -M
+  declare -A AMD_POWER_CAPS
+  while read -r line; do
+    if [[ "$line" =~ ^GPU\[([0-9]+)\]\ :\ Max\ Graphics\ Package\ Power.*:\ ([0-9.]+)\ W ]]; then
+      gpu_index="${BASH_REMATCH[1]}"
+      power_cap="${BASH_REMATCH[2]}"
+      AMD_POWER_CAPS["$gpu_index"]="$power_cap"
+    fi
+  done < <($ROCM_SMI -M 2>/dev/null)
+
   output=$(timeout $TIMEOUT $ROCM_SMI --showmeminfo=vram --showproductname --showtemp --showuse --showpower --csv)
   if [ $? -ne 0 ]; then
     write_error "rocm-smi command failed - $output"
     exit 1
   fi
-
+  
+# Convert bytes to MiB for AMD GPU RA metric
   echo "$output" | awk -F',' '
   NR==1 { next }
   /^card/ {
@@ -104,6 +116,7 @@ get_amd() {
     GPUUtilPercent=$AMDGPUUse
     GPUUtilPercentAvg=$AMDGPUUse
     GPUPowerDraw=$(printf "%.1f" "$AMDPower")
+    GPUPowerCap="${AMD_POWER_CAPS[$GPUInstance]:-0}"
     write_log
   done
 }
