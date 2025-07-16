@@ -74,17 +74,16 @@ get_nvidia() {
 }
 
 get_amd() {
-  declare -A AMD_POWER_CAPS
+declare -A AMD_POWER_CAPS
 
-# Get AMD power cap here
 while read -r line; do
-  if [[ "$line" =~ ^GPU\[([0-9]+)\]\s+:\s+Max\ Graphics\ Package\ Power.*:\s+([0-9.]+)\ W ]]; then
+  # Skip lines that don't start with GPU[
+  if [[ "$line" =~ ^GPU\[([0-9]+)\][[:space:]]*:[[:space:]]*Max\ Graphics\ Package\ Power\ \(W\):\ ([0-9.]+) ]]; then
     gpu_index="${BASH_REMATCH[1]}"
     cap="${BASH_REMATCH[2]}"
     AMD_POWER_CAPS["$gpu_index"]="$cap"
   fi
 done < <($ROCM_SMI -M 2>/dev/null)
-
 
   output=$(timeout $TIMEOUT $ROCM_SMI --showmeminfo=vram --showproductname --showtemp --showuse --showpower --csv)
   if [ $? -ne 0 ]; then
